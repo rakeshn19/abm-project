@@ -1,20 +1,29 @@
-import mesa
 from agent import Customer, Store
 from mesa import Model, DataCollector
 from mesa.space import MultiGrid
-from mesa.time import RandomActivation
-import math
 from scheduler import RandomActivationByTypeFiltered
 
 
-class HotellingModel(mesa.Model):
+class HotellingModel(Model):
+    verbose = False  # Print-monitoring
+    width = 20,
+    height = 20,
+    initial_customer_per_cell = 10,
+    initial_store = 4,
+    distance_sensibity = .1,
+    initial_store_price = 10,
+    is_customers_stationary = True
+    enable_price = True
+
     def __init__(self, width=20,
                  height=20,
                  initial_customer_per_cell=10,
                  initial_store=5,
                  distance_sensibity=.1,
                  initial_store_price=10,
-                 is_customers_stationary=True):
+                 is_customers_stationary=True,
+                 enable_price=True
+                 ):
         print("Entered")
         super(HotellingModel, self).__init__()
         self.initial_store_price = initial_store_price
@@ -23,13 +32,13 @@ class HotellingModel(mesa.Model):
         self.height = height
         self.customer_per_cell = initial_customer_per_cell
         self.store_nums = initial_store
-        # self.cust_buying_power = cust_buying_power
         self.stationary_cust = is_customers_stationary
         self.grid = MultiGrid(width, height, True)
         self.schedule = RandomActivationByTypeFiltered(self)
         self.total_cust = 0
         self.customers = []
         self.stores = []
+        self.enable_price = enable_price
         for i in range(self.store_nums):
             self.create_store(id=i)
 
@@ -37,20 +46,10 @@ class HotellingModel(mesa.Model):
             for j in range(width):
                 self.create_customers(i, j)
 
-        '''
-                    # For testing purposes, agent's individual x and y
-            {"x": lambda a: a.pos[0], "y": lambda a: a.pos[1]},
-        '''
-        '''{
-                      "Store": lambda m: m.schedule.get_type_count(Store),
-                      # "Agent1": lambda m: m.get_trade()
-                  }'''
         model_data_collector = self.get_model_data_collector()
         self.datacollector = DataCollector(
             model_data_collector,
             agent_reporters={"Revenue": lambda x: getattr(x, "revenue", 0)},
-            #gent_reporters={"Revenue": lambda x: getattr(, "revenue", 0)}
-           # agent_reporters={"Revenue": revenue},
         )
         self.datacollector.collect(self)
 
@@ -88,15 +87,18 @@ class HotellingModel(mesa.Model):
         return list of trade partners and None for other agents
         """
         if isinstance(agent, Store):
-           # print("agent.revenue", agent.unique_id, agent.revenue)
+            # print("agent.revenue", agent.unique_id, agent.revenue)
             return agent.revenue
         else:
             return 0
 
     def get_trade(self, store_id):
         store = self.get_all_stores()[store_id]
-        #print("store *****", store_id, store.revenue)
         return store.revenue
+
+    def get_price(self, store_id):
+        store = self.get_all_stores()[store_id]
+        return store.price
 
     def get_model_data_collector(self):
         dc = {
@@ -105,11 +107,7 @@ class HotellingModel(mesa.Model):
         stores = self.get_all_stores()
 
         for store in stores:
-            #print("store id is ", store.unique_id)
             i = store.unique_id
-            print(i)
-            dc["Store" + str(store.unique_id)] = [self.get_trade,[i]]
-
+            dc["Store_" + str(store.unique_id)] = [self.get_trade, [i]]
+            dc["Store_" + str(store.unique_id) + "_price"] = [self.get_price, [i]]
         return dc
-
-

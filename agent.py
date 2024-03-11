@@ -25,8 +25,8 @@ class Customer(mesa.Agent):
         return (self.current_price is None or new_price < self.current_price), new_price
 
     def will_choose_new_price(self, location, price):
-        new_price = self.calculate_price(location, price)#price + self.calculate_distance_price_factor(location)
-        return self.current_price is None or new_price < self.current_price, new_price
+        new_price = self.calculate_price(location, price)
+        return self.current_price is None or new_price <= self.current_price, new_price
 
     def calculate_price(self, loc, price):
         new_price = price + self.calculate_distance_price_factor(loc)
@@ -34,11 +34,14 @@ class Customer(mesa.Agent):
 
     def choose_store(self):
         stores = self.model.get_all_stores()
+        all_store = []
         for store in stores:
             is_min, new_price = self.will_choose_new_store(store.pos, store.price)
             if is_min:
-                self.choosen_store = store
+                all_store.append(store)
                 self.current_price = new_price
+        if len(all_store) >0:
+             self.choosen_store = random.choice(all_store)
         self.choosen_store.transact(self)
 
     def calculate_distance_price_factor(self, store_pos):
@@ -46,8 +49,7 @@ class Customer(mesa.Agent):
         x2, y2 = self.pos
         # Calculate the distance
         distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-        #print(distance)
-        return distance #*  self.distance_sensibity
+        return distance
 
 
 class Store(RandomWalker):
@@ -65,14 +67,15 @@ class Store(RandomWalker):
         if self.profit != 0:
             self.revenue = self.profit
         profit_with_move, new_loc = self.calculate_profit_after_move()
-        if profit_with_move > self.profit:
+        if profit_with_move > self.profit and new_loc != self.pos:
             print("Agent ", self.unique_id, "moving")
             self.model.grid.move_agent(self, new_loc)
             self.pos = new_loc
-        new_profit, new_price = self.calculate_profit_after_price_change()
-        if new_profit > self.profit:
-            print("Agent ", self.unique_id , " is changing price from",self.price, "to new price", new_price)
-            self.price = new_price
+        if self.model.enable_price:
+            new_profit, new_price = self.calculate_profit_after_price_change()
+            if new_profit > self.profit:
+                print("Agent ", self.unique_id , " is changing price from",self.price, "to new price", new_price)
+                self.price = new_price
         self.reset()
 
     def transact(self, customer: Customer):
@@ -86,14 +89,20 @@ class Store(RandomWalker):
         return self.price
 
     def calculate_profit_after_move(self):
-        new_loc = self.next_possible_move()
-        total_profit_after_move = self.calculate_profit_by_location(new_loc)
-        return total_profit_after_move, new_loc
+        new_locs = self.next_all_possible_move()
+        choosen_move = None
+        max_profit = None
+        for loc in new_locs:
+            total_profit_after_move = self.calculate_profit_by_location(loc)
+            if choosen_move is None or total_profit_after_move >= max_profit:
+                choosen_move = loc
+                max_profit = total_profit_after_move
+        return max_profit, choosen_move
 
     def calculate_profit_after_price_change(self):
         price_update = [1, -1]
         new_price = self.price + random.choice(price_update)
-        if new_price < 1:
+        if new_price <= 5:
             return -1, 1
         new_profit = self.calculate_profit_by_price(new_price)
         return new_profit, new_price

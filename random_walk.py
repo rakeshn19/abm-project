@@ -43,3 +43,7 @@ class RandomWalker(mesa.Agent):
         next_moves = self.model.grid.get_neighborhood(self.pos, self.moore, True)
         next_move = self.random.choice(next_moves)
         return next_move
+
+    def next_all_possible_move(self):
+        next_moves = self.model.grid.get_neighborhood(self.pos, self.moore, True)
+        return next_moves
